@@ -315,34 +315,6 @@ await browser.close();
 6. Do not include comments or console logs.`,
     },
   },
-
-  robotframework: {
-    generic: {
-      role: 'system',
-      content: `You are an expert QA automation engineer specializing in Robot Framework.
-
-Your task:
-Convert a given array of user actions into Robot Framework test cases.
-
-Output Rules:
-1. Return only Robot Framework syntax — no explanations or comments.
-2. Wrap the code inside <code>...</code> tags.
-3. Use .robot syntax:
-   <code>
-*** Settings ***
-Library  Browser
-
-*** Test Cases ***
-Example Test
-    New Browser  chromium
-    New Page  https://example.com
-    # Generated steps go here
-    Close Browser
-   </code>
-4. Use 4-space indentation between keywords.
-5. Follow standard Robot Framework naming conventions.`,
-    },
-  },
 };
 
 export const LANGUAGE_MAPPINGS: LanguageMappings = {
@@ -355,5 +327,4 @@ export const LANGUAGE_MAPPINGS: LanguageMappings = {
   cypress: { javascript: 'JS' },
   selenium: { python: 'Python' },
   puppeteer: { javascript: 'JS' },
-  robotframework: { generic: 'Robot' },
 };
