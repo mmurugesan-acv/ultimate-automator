@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playwright Live Stream</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f0f0f0;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .controls {
+      margin-bottom: 20px;
+      padding: 10px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .stream-container {
+      background-color: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    #streamImg {
+      max-width: 100%;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+    }
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #e8f4f8;
+      border-radius: 5px;
+    }
+    button {
+      background-color: #007cba;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      background-color: #005a87;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Playwright Live Stream</h1>
+    
+    <div class="controls">
+      <button onclick="startTest()">Start Test</button>
+      <button onclick="refreshStream()">Refresh Stream</button>
+      <button onclick="checkDebug()">Check Display Status</button>
+      <button onclick="toggleStream()">Toggle Stream</button>
+      <span id="status">Ready</span>
+    </div>
+    
+    <div class="stream-container">
+      <img id="streamImg" src="http://localhost:3001/stream.mjpeg" width="800" alt="Live Stream">
+      <div class="status">
+        <p><strong>Stream URL:</strong> http://localhost:3001/stream.mjpeg</p>
+        <p><strong>Status:</strong> <span id="streamStatus">Loading...</span></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const streamImg = document.getElementById('streamImg');
+    const streamStatus = document.getElementById('streamStatus');
+    const status = document.getElementById('status');
+
+    streamImg.onload = function() {
+      streamStatus.textContent = 'Stream Active';
+      streamStatus.style.color = 'green';
+    };
+
+    streamImg.onerror = function() {
+      streamStatus.textContent = 'Stream Error - Check if server is running';
+      streamStatus.style.color = 'red';
+    };
+
+    function startTest() {
+      status.textContent = 'Starting test...';
+      fetch('http://localhost:3001/run-script', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+      })
+      .then(response => response.json())
+      .then(data => {
+        status.textContent = 'Test started successfully!';
+        console.log('Test response:', data);
+      })
+      .catch(error => {
+        status.textContent = 'Error starting test';
+        console.error('Error:', error);
+      });
+    }
+
+    function refreshStream() {
+      const currentSrc = streamImg.src;
+      streamImg.src = '';
+      setTimeout(() => {
+        streamImg.src = currentSrc + '?t=' + new Date().getTime();
+      }, 100);
+    }
+
+    function checkDebug() {
+      fetch('http://localhost:3001/debug')
+        .then(response => response.json())
+        .then(data => {
+          console.log('Debug info:', data);
+          alert(`Display Status: ${data.displayStatus}\nExit Code: ${data.exitCode}\nError: ${data.error}`);
+        })
+        .catch(error => {
+          console.error('Debug error:', error);
+          alert('Error checking debug info: ' + error.message);
+        });
+    }
+
+    let streamEnabled = true;
+    function toggleStream() {
+      if (streamEnabled) {
+        streamImg.src = '';
+        streamEnabled = false;
+        document.querySelector('button[onclick="toggleStream()"]').textContent = 'Enable Stream';
+      } else {
+        streamImg.src = 'http://localhost:3001/stream.mjpeg?t=' + new Date().getTime();
+        streamEnabled = true;
+        document.querySelector('button[onclick="toggleStream()"]').textContent = 'Disable Stream';
+      }
+    }
+
+    // Add some debug logging
+    console.log('Stream HTML loaded');
+    console.log('Stream URL:', streamImg.src);
+  </script>
+</body>
+</html>
