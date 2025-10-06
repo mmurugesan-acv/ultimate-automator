@@ -1,14 +1,15 @@
-FROM mcr.microsoft.com/playwright:v1.42.1-focal
+FROM mcr.microsoft.com/playwright:v1.55.1-jammy
 
 RUN apt-get update && apt-get install -y \
     xvfb \
     ffmpeg \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY . .
 
-RUN npm install && \
-    cd playwright-basic-demo && npm install
+# Install dotenv to load .env files
+RUN npm install dotenv
 
 CMD ["bash", "-c", "Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset & node server.js"]

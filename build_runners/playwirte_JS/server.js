@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from "express";
 import { spawn } from "child_process";
 import fs from "fs";
@@ -127,11 +128,120 @@ app.get("/debug", (req, res) => {
   });
 });
 
-app.post("/run-script", (req, res) => {
-  res.json({ status: "started", streamUrl: `/stream.mjpeg` });
+app.post("/run-script", async (req, res) => {
+  const { repository, githubToken, testConfig } = req.body;
+  
+  console.log('Received test run request:', { repository: repository?.name, testConfig });
+  
+  res.json({ 
+    status: "started", 
+    streamUrl: `/stream.mjpeg`,
+    repository: repository?.name 
+  });
 
-  // Run Playwright tests in the background
-  spawn("bash", ["-c", "export DISPLAY=:99 && cd playwright-basic-demo && npx playwright test tests-examples/demo-todo-app.spec.ts --headed"], { stdio: "inherit" });
+  try {
+    // Clone the repository
+    if (repository?.clone_url) {
+      console.log('Cloning repository:', repository.clone_url);
+      
+      // Remove existing directory if it exists
+      const repoDir = `cloned-repo`;
+      if (fs.existsSync(repoDir)) {
+        fs.rmSync(repoDir, { recursive: true, force: true });
+      }
+
+      // Determine clone URL based on repository privacy
+      let cloneUrl = repository.clone_url;
+      
+      // For private repositories, use token-authenticated URL
+      if (repository.private && githubToken) {
+        cloneUrl = repository.clone_url.replace(
+          'https://github.com/',
+          `https://${githubToken}@github.com/`
+        );
+        console.log('Using authenticated clone for private repository');
+      }
+
+      // Clone the repository
+      const cloneProcess = spawn("git", [
+        "clone",
+        cloneUrl,
+        repoDir
+      ], { stdio: "inherit" });
+
+      cloneProcess.on("close", (code) => {
+        if (code === 0) {
+          console.log('Repository cloned successfully');
+          
+          // Install dependencies if package.json exists
+          const packageJsonPath = `${repoDir}/package.json`;
+          if (fs.existsSync(packageJsonPath)) {
+            console.log('Installing dependencies...');
+            const npmInstall = spawn("npm", ["install"], { 
+              cwd: repoDir,
+              stdio: "inherit" 
+            });
+
+            npmInstall.on("close", (installCode) => {
+              if (installCode === 0) {
+                console.log('Dependencies installed successfully');
+                
+                // Install Playwright browsers for the cloned repo
+                console.log('Installing Playwright browsers for cloned repository...');
+                const playwrightInstall = spawn("npx", ["playwright", "install"], { 
+                  cwd: repoDir,
+                  stdio: "inherit" 
+                });
+
+                playwrightInstall.on("close", (browserInstallCode) => {
+                  if (browserInstallCode === 0) {
+                    console.log('Playwright browsers installed successfully');
+                  } else {
+                    console.log('Playwright browser install failed, but continuing...');
+                  }
+                  runTests(repoDir, testConfig);
+                });
+
+                playwrightInstall.on("error", (error) => {
+                  console.error('Playwright install error:', error);
+                  runTests(repoDir, testConfig);
+                });
+              } else {
+                console.error('Failed to install dependencies');
+              }
+            });
+          } else {
+            console.log('No package.json found, running tests directly');
+            runTests(repoDir, testConfig);
+          }
+        } else {
+          console.error('Failed to clone repository, exit code:', code);
+        }
+      });
+
+      cloneProcess.on("error", (error) => {
+        console.error('Git clone error:', error);
+      });
+    } else {
+      // Fallback to default repository
+      console.log('No repository specified, using default');
+      runTests('playwright-basic-demo', testConfig);
+    }
+  } catch (error) {
+    console.error('Error in run-script:', error);
+  }
 });
+
+function runTests(directory, testConfig) {
+  console.log(`Running tests in directory: ${directory}`);
+  
+  // Run Playwright tests
+  const testCommand = `export DISPLAY=:99 && cd ${directory} && npx playwright test --headed`;
+  
+  spawn("bash", ["-c", testCommand], { 
+    stdio: "inherit",
+    env: { ...process.env, DISPLAY: ":99" }
+  });
+}
 
 app.listen(3000, () => console.log("Playwright server running on port 3000"));

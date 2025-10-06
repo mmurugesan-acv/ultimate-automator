@@ -24,4 +24,27 @@ export class AppController {
 
     return res.json(result);
   }
+
+  @Post('run-tests')
+  async runTests(
+    @Req()
+    req: Request & {
+      body: {
+        userId: string;
+        target: string;
+        language: string;
+        content: string;
+      };
+    },
+    @Res() res: Response,
+  ) {
+    const result = await this.appService.runTests(
+      req.body.userId,
+      req.body.target,
+      req.body.language,
+      req.body.content,
+    );
+
+    return res.json(result);
+  }
 }

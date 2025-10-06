@@ -1,15 +1,28 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable } from '@nestjs/common';
 import { PROMPT_FOR_FRAMEWORKS } from './prompt';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const LLM_URL =
   'https://llm-gateway.internal.latest.acvauctions.com/openai/v1/chat/completions';
 
 @Injectable()
 export class AppService {
+  private dbPath = path.join(process.cwd(), 'db.json');
+
+  private readDatabase() {
+    try {
+      const data = fs.readFileSync(this.dbPath, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      console.error('Error reading database:', error);
+      return { githubTokens: {}, users: {}, selectedRepositories: {} };
+    }
+  }
+
   async generateCode(target: string, language: string, content: string) {
     try {
       const systemPrompt = PROMPT_FOR_FRAMEWORKS[target][language];
@@ -57,6 +70,59 @@ export class AppService {
       return {
         success: false,
         message: 'Code generation failed',
+        error: error.message,
+      };
+    }
+  }
+
+  async runTests(
+    userId: string,
+    target: string,
+    language: string,
+    content: string,
+  ) {
+    try {
+      const db = this.readDatabase();
+      const selectedRepo = db.selectedRepositories?.[userId];
+      const githubToken = db.githubTokens?.[userId];
+
+      if (!selectedRepo) {
+        return {
+          success: false,
+          error: 'No repository selected for this user',
+        };
+      }
+
+      // Send request to Docker container
+      const dockerResponse = await fetch('http://localhost:3001/run-script', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          repository: selectedRepo,
+          githubToken: githubToken,
+          testConfig: {
+            target,
+            language,
+            content,
+          },
+        }),
+      });
+
+      const dockerResult = await dockerResponse.json();
+
+      return {
+        success: true,
+        message: 'Test execution started',
+        data: {
+          streamUrl: 'http://localhost:3001/stream.mjpeg',
+          ...dockerResult,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
         error: error.message,
       };
     }
