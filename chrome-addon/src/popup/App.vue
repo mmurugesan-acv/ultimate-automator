@@ -16,6 +16,6 @@ const openOptions = () => {
 
 <template>
   <LightDarkMode />
-  <h1>PopUp</h1>
+  <h1>Pop</h1>
   <Button @click="openOptions">Click me</Button>
 </template>
