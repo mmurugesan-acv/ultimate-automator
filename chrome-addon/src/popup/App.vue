@@ -14,11 +14,31 @@ import LightDarkMode from '@/components/shared/light-dark-mode-changer/LightDark
 // Array to store captured events
 const capturedEvents = ref([])
 const isRecording = ref(false)
+const currentTabUrl = ref('')
 let pollingInterval = null
 
+// Function to get current tab URL
+function getCurrentTabUrl() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]) {
+      currentTabUrl.value = tabs[0].url
+      console.log('Current tab URL:', currentTabUrl.value)
+    }
+  })
+}
+
 const openPortal = () => {
-  chrome.storage.local.set({ data: capturedEvents.value }, () => {
-    console.log("Data saved");
+  // Add navigate event with current tab URL to the beginning of capturedEvents
+  const eventsWithNavigation = [
+    {
+      type: 'navigate',
+      url: currentTabUrl.value
+    },
+    ...capturedEvents.value
+  ];
+
+  chrome.storage.local.set({ data: eventsWithNavigation }, () => {
+    console.log("Data saved with navigation event");
   });
 
   // Reset the popup state
@@ -71,6 +91,7 @@ function stopPolling() {
 
 onMounted(() => {
   loadEvents()
+  getCurrentTabUrl() // Get current tab URL when popup opens
   // Check if already recording and start polling if needed
   chrome.storage.local.get(['isRecording'], (result) => {
     if (result.isRecording) {

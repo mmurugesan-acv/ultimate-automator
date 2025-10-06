@@ -2,33 +2,71 @@
 let isTracking = false;
 let trackedIframes = new Set();
 
-// Helper function to get element selector
-function getElementSelector(element) {
+// Helper function to get a unique XPath
+function getXPath(element) {
+  // If element has an ID, use it
   if (element.id) {
-    return `#${element.id}`;
+    return `//*[@id="${element.id}"]`;
   }
   
-  if (element.className && typeof element.className === 'string') {
-    const classes = element.className.trim().split(/\s+/).join('.');
-    if (classes) {
-      return `${element.tagName.toLowerCase()}.${classes}`;
+  // Check for unique data attributes
+  const dataAttrs = Array.from(element.attributes).filter(attr => 
+    attr.name.startsWith('data-') && attr.value
+  );
+  
+  for (let attr of dataAttrs) {
+    const xpath = `//*[@${attr.name}="${attr.value}"]`;
+    try {
+      const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      if (result.snapshotLength === 1) {
+        return xpath;
+      }
+    } catch (e) {
+      // Continue to next attribute
     }
   }
   
-  return element.tagName.toLowerCase();
-}
-
-// Helper function to get element path
-function getElementPath(element) {
-  const path = [];
+  // Check for unique class attribute
+  if (element.className && typeof element.className === 'string') {
+    const classes = element.className.trim().split(/\s+/);
+    for (let className of classes) {
+      if (className) {
+        const xpath = `//${element.tagName.toLowerCase()}[@class="${element.className}"]`;
+        try {
+          const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+          if (result.snapshotLength === 1) {
+            return xpath;
+          }
+        } catch (e) {
+          // Continue to next check
+        }
+      }
+    }
+  }
+  
+  // Generate positional XPath
+  let path = '';
   let current = element;
   
-  while (current && current !== document.body) {
-    path.unshift(getElementSelector(current));
+  while (current && current !== document.documentElement) {
+    let index = 1;
+    let sibling = current.previousElementSibling;
+    
+    while (sibling) {
+      if (sibling.tagName === current.tagName) {
+        index++;
+      }
+      sibling = sibling.previousElementSibling;
+    }
+    
+    const tagName = current.tagName.toLowerCase();
+    const position = index > 1 ? `[${index}]` : '';
+    path = `/${tagName}${position}${path}`;
+    
     current = current.parentElement;
   }
   
-  return path.join(' > ');
+  return `/${document.documentElement.tagName.toLowerCase()}${path}`;
 }
 
 // Click event handler
@@ -37,20 +75,7 @@ function handleClick(e) {
   
   const eventData = {
     type: 'click',
-    context: context,
-    timestamp: new Date().toISOString(),
-    element: {
-      tagName: e.target.tagName,
-      id: e.target.id || null,
-      className: e.target.className || null,
-      text: e.target.innerText?.substring(0, 50) || null,
-      selector: getElementSelector(e.target),
-      path: getElementPath(e.target),
-    },
-    position: {
-      x: e.clientX,
-      y: e.clientY
-    }
+    selector: getXPath(e.target)
   };
   
   // Store event in chrome.storage instead of sending to popup
@@ -69,24 +94,25 @@ function handleInput(e) {
   
   const eventData = {
     type: 'input',
-    context: context,
-    timestamp: new Date().toISOString(),
-    element: {
-      tagName: e.target.tagName,
-      id: e.target.id || null,
-      className: e.target.className || null,
-      name: e.target.name || null,
-      type: e.target.type || null,
-      selector: getElementSelector(e.target),
-      path: getElementPath(e.target),
-    },
+    selector: getXPath(e.target),
     value: e.target.value
   };
   
   // Store event in chrome.storage instead of sending to popup
   chrome.storage.local.get(['capturedEvents'], (result) => {
     const events = result.capturedEvents || [];
-    events.push(eventData);
+    
+    // Find existing input event with the same selector
+    const existingIndex = events.findIndex(event => event.selector === eventData.selector);
+    
+    if (existingIndex !== -1) {
+      // Update existing entry
+      events[existingIndex].value = eventData.value;
+    } else {
+      // Add new entry
+      events.push(eventData);
+    }
+    
     chrome.storage.local.set({ capturedEvents: events });
   });
   
@@ -180,6 +206,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'startTracking') {
     if (!isTracking) {
       isTracking = true;
+      
       // Attach event listeners to main document
       attachListenersToDocument(document);
       
