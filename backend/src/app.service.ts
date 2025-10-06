@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable } from '@nestjs/common';
-import { PROMPT_FOR_FRAMWORKS } from './prompt';
+import { PROMPT_FOR_FRAMEWORKS } from './prompt';
 
 const LLM_URL =
   'https://llm-gateway.internal.latest.acvauctions.com/openai/v1/chat/completions';
@@ -10,7 +10,7 @@ const LLM_URL =
 export class AppService {
   async generateCode(target: string, language: string, content: string) {
     try {
-      const systemPrompt = PROMPT_FOR_FRAMWORKS[target][language];
+      const systemPrompt = PROMPT_FOR_FRAMEWORKS[target][language];
 
       if (!systemPrompt) {
         throw new Error(`Unsupported target: ${target}`);
