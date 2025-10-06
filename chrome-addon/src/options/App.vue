@@ -4,9 +4,8 @@ import { onMounted } from 'vue';
 import LightDarkMode from '@/components/shared/light-dark-mode-changer/LightDarkMode.vue';
 
 onMounted(() => {
-  // TODO: receive the data for next processing
-  chrome.storage.local.get("myData", (result) => {
-    console.log("Received data:", result.myData);
+  chrome.storage.local.get("data", (result) => {
+    console.log("Received data:", result.data);
   });
 })
 </script>
