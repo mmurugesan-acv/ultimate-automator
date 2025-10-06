@@ -1,15 +1,57 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PROMPT_FOR_FRAMEWORKS } from './prompt';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const LLM_URL =
   'https://llm-gateway.internal.latest.acvauctions.com/openai/v1/chat/completions';
 
+interface Database {
+  githubTokens: { [userId: string]: string };
+  users: { [userId: string]: any };
+}
+
 @Injectable()
 export class AppService {
-  constructor(private configService: ConfigService) {}
+  private dbPath = path.join(process.cwd(), 'db.json');
+
+  constructor(private configService: ConfigService) {
+    this.initializeDatabase();
+  }
+
+  private initializeDatabase() {
+    if (!fs.existsSync(this.dbPath)) {
+      const initialData: Database = {
+        githubTokens: {},
+        users: {},
+      };
+      fs.writeFileSync(this.dbPath, JSON.stringify(initialData, null, 2));
+    }
+  }
+
+  private readDatabase(): Database {
+    try {
+      const data = fs.readFileSync(this.dbPath, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      console.error('Error reading database:', error);
+      return { githubTokens: {}, users: {} };
+    }
+  }
+
+  private writeDatabase(data: Database) {
+    try {
+      fs.writeFileSync(this.dbPath, JSON.stringify(data, null, 2));
+    } catch (error) {
+      console.error('Error writing database:', error);
+      throw new Error('Failed to save data');
+    }
+  }
 
   async generateCode(target: string, language: string, content: string) {
     try {
@@ -143,6 +185,81 @@ export class AppService {
       }
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  }
+
+  storeGitHubToken(token: string, userId: string) {
+    try {
+      const db = this.readDatabase();
+      db.githubTokens[userId] = token;
+      this.writeDatabase(db);
+
+      return {
+        success: true,
+        message: 'Token stored successfully',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  getStoredGitHubToken(userId: string): string | null {
+    try {
+      const db = this.readDatabase();
+      return db.githubTokens[userId] || null;
+    } catch (error) {
+      console.error('Error retrieving token:', error);
+      return null;
+    }
+  }
+
+  async getGitHubRepositories(token: string) {
+    try {
+      const response = await fetch(
+        'https://api.github.com/user/repos?sort=updated&per_page=50',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/vnd.github.v3+json',
+          },
+        },
+      );
+
+      if (response.ok) {
+        const repositories = await response.json();
+
+        // Filter and format repository data
+        const formattedRepos = repositories.map((repo) => ({
+          id: repo.id,
+          name: repo.name,
+          full_name: repo.full_name,
+          description: repo.description,
+          private: repo.private,
+          clone_url: repo.clone_url,
+          ssh_url: repo.ssh_url,
+          html_url: repo.html_url,
+          updated_at: repo.updated_at,
+          language: repo.language,
+        }));
+
+        return {
+          success: true,
+          repositories: formattedRepos,
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Failed to fetch repositories',
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
     }
   }
 }

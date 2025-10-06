@@ -68,4 +68,29 @@ export class AppController {
   async getGitHubUser(@Req() req: Request & { body: { token: string } }) {
     return await this.appService.getGitHubUser(req.body.token);
   }
+
+  @Post('auth/github/store-token')
+  storeGitHubToken(
+    @Req() req: Request & { body: { token: string; userId: string } },
+  ) {
+    return this.appService.storeGitHubToken(req.body.token, req.body.userId);
+  }
+
+  @Post('auth/github/repositories')
+  async getGitHubRepositories(
+    @Req() req: Request & { body: { token: string } },
+  ) {
+    console.log('Get repos');
+
+    return await this.appService.getGitHubRepositories(req.body.token);
+  }
+
+  @Post('auth/github/get-token')
+  getStoredGitHubToken(@Req() req: Request & { body: { userId: string } }) {
+    const token = this.appService.getStoredGitHubToken(req.body.userId);
+    return {
+      success: !!token,
+      token: token,
+    };
+  }
 }
