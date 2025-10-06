@@ -83,4 +83,27 @@ export class GitIntegrationController {
       token: token,
     };
   }
+
+  @Post('select-repository')
+  async selectRepository(
+    @Req()
+    req: Request & {
+      body: {
+        userId: string;
+        repository: {
+          id: number;
+          name: string;
+          full_name: string;
+          clone_url: string;
+          ssh_url: string;
+          private: boolean;
+        };
+      };
+    },
+  ) {
+    return await this.gitIntegrationService.storeSelectedRepository(
+      req.body.userId,
+      req.body.repository,
+    );
+  }
 }

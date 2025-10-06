@@ -142,9 +142,48 @@ function handleGitHubAuth() {
   }, 1000)
 }
 
-function selectRepository(repo) {
+async function selectRepository(repo) {
   selectedRepository.value = repo
   console.log('Selected repository:', repo)
+  
+  // Store selection on server
+  if (githubUser.value) {
+    await storeRepositorySelection(repo)
+  }
+}
+
+async function storeRepositorySelection(repository) {
+  try {
+    console.log('Storing repository selection on server...')
+    const response = await fetch('http://localhost:3000/api/auth/github/select-repository', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        userId: githubUser.value.id.toString(),
+        repository: {
+          id: repository.id,
+          name: repository.name,
+          full_name: repository.full_name,
+          clone_url: repository.clone_url,
+          ssh_url: repository.ssh_url,
+          private: repository.private,
+        }
+      }),
+    })
+    
+    const result = await response.json()
+    console.log('Repository selection result:', result)
+    
+    if (result.success) {
+      console.log('Repository selection stored successfully')
+    } else {
+      console.error('Failed to store repository selection:', result.error)
+    }
+  } catch (error) {
+    console.error('Error storing repository selection:', error)
+  }
 }
 </script>
 
@@ -219,7 +258,8 @@ function selectRepository(repo) {
         </div>
       </div>
       
-      <p v-if="selectedRepository" class="text-xs text-green-600 mt-2">
+      <p v-if="selectedRepository" class="text-xs text-green-600 mt-2 flex items-center gap-1">
+        <Icon icon="radix-icons:check-circled" class="w-3 h-3" />
         Selected: {{ selectedRepository.name }}
       </p>
     </div>

@@ -10,6 +10,7 @@ import * as path from 'path';
 interface Database {
   githubTokens: { [userId: string]: string };
   users: { [userId: string]: any };
+  selectedRepositories: { [userId: string]: any };
 }
 
 @Injectable()
@@ -25,6 +26,7 @@ export class GitIntegrationService {
       const initialData: Database = {
         githubTokens: {},
         users: {},
+        selectedRepositories: {},
       };
       fs.writeFileSync(this.dbPath, JSON.stringify(initialData, null, 2));
     }
@@ -36,7 +38,7 @@ export class GitIntegrationService {
       return JSON.parse(data);
     } catch (error) {
       console.error('Error reading database:', error);
-      return { githubTokens: {}, users: {} };
+      return { githubTokens: {}, users: {}, selectedRepositories: {} };
     }
   }
 
@@ -201,6 +203,46 @@ export class GitIntegrationService {
         success: false,
         error: error.message,
       };
+    }
+  }
+
+  storeSelectedRepository(userId: string, repository: any) {
+    try {
+      const db = this.readDatabase();
+
+      if (!db.selectedRepositories) {
+        db.selectedRepositories = {};
+      }
+
+      db.selectedRepositories[userId] = {
+        ...repository,
+        selectedAt: new Date().toISOString(),
+      };
+
+      this.writeDatabase(db);
+
+      return {
+        success: true,
+        message: 'Repository selected successfully',
+        data: {
+          repository: db.selectedRepositories[userId],
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  getSelectedRepository(userId: string) {
+    try {
+      const db = this.readDatabase();
+      return db.selectedRepositories?.[userId] || null;
+    } catch (error) {
+      console.error('Error retrieving selected repository:', error);
+      return null;
     }
   }
 }
