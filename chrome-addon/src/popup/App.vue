@@ -4,18 +4,21 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 
 import LightDarkMode from '@/components/shared/light-dark-mode-changer/LightDarkMode.vue';
+import { Icon } from '@iconify/vue';
 
 // Array to store captured events
 const capturedEvents = ref([])
 const isRecording = ref(false)
 const currentTabUrl = ref('')
 let pollingInterval = null
+
+const githubUser = ref(null)
+const isGithubAuthenticated = ref(false)
 
 // Function to get current tab URL
 function getCurrentTabUrl() {
@@ -98,6 +101,13 @@ onMounted(() => {
       startPolling()
     }
   })
+
+  // Check for stored GitHub token
+  chrome.storage.local.get(['githubToken'], async (result) => {
+    if (result.githubToken) {
+      await verifyGitHubToken(result.githubToken)
+    }
+  })
 })
 
 onUnmounted(() => {
@@ -143,6 +153,73 @@ function stop() {
     })
   })
 }
+
+async function verifyGitHubToken(token) {
+  try {
+    const response = await fetch('http://localhost:3000/api/auth/github/user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token }),
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      githubUser.value = result.user
+      isGithubAuthenticated.value = true
+    } else {
+      // Token is invalid, remove it
+      chrome.storage.local.remove(['githubToken'])
+    }
+  } catch (error) {
+    console.error('Error verifying GitHub token:', error)
+  }
+}
+
+function handleGitHubAuth() {
+  if (isGithubAuthenticated.value) {
+    return
+  }
+  
+  // Open GitHub OAuth popup
+  const popup = window.open(
+    'http://localhost:3000/api/auth/github',
+    'github_auth',
+    'width=600,height=700,scrollbars=yes,resizable=yes'
+  )
+  
+  // Listen for auth result
+  const messageListener = (event) => {
+    if (event.origin !== 'http://localhost:3000') return
+    
+    if (event.data.type === 'GITHUB_AUTH_SUCCESS') {
+      const { token, user } = event.data.data
+      
+      // Store token
+      chrome.storage.local.set({ githubToken: token }, () => {
+        githubUser.value = user
+        isGithubAuthenticated.value = true
+        console.log('GitHub authentication successful')
+      })
+      
+      window.removeEventListener('message', messageListener)
+    } else if (event.data.type === 'GITHUB_AUTH_ERROR') {
+      console.error('GitHub auth error:', event.data.error)
+      window.removeEventListener('message', messageListener)
+    }
+  }
+  
+  window.addEventListener('message', messageListener)
+  
+  const checkClosed = setInterval(() => {
+    if (popup.closed) {
+      window.removeEventListener('message', messageListener)
+      clearInterval(checkClosed)
+    }
+  }, 1000)
+}
 </script>
 
 <template>
@@ -155,7 +232,18 @@ function stop() {
       </CardDescription>
     </CardHeader>
 
-    <LightDarkMode class="shrink-0" />
+    <div class="flex items-center gap-2 shrink-0">
+      <LightDarkMode />
+      <button
+        @click="handleGitHubAuth"
+        class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        :class="{ 'text-green-600': isGithubAuthenticated }"
+        :aria-label="isGithubAuthenticated ? 'GitHub Connected' : 'Connect GitHub'"
+      >
+        <Icon icon="radix-icons:github-logo" class="w-5 h-5" />
+      </button>
+    </div>
+    
   </div>
 
   <CardContent class="flex flex-col items-center">
