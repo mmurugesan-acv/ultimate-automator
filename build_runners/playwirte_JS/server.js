@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import express from "express";
 import { spawn } from "child_process";
 import fs from "fs";
@@ -172,6 +171,21 @@ app.post("/run-script", async (req, res) => {
       cloneProcess.on("close", (code) => {
         if (code === 0) {
           console.log('Repository cloned successfully');
+          
+          // Copy .env file to cloned repository if it exists
+          const envSourcePath = '.env';
+          const envDestPath = `${repoDir}/.env`;
+          
+          if (fs.existsSync(envSourcePath)) {
+            try {
+              fs.copyFileSync(envSourcePath, envDestPath);
+              console.log('.env file copied to cloned repository');
+            } catch (error) {
+              console.error('Failed to copy .env file:', error);
+            }
+          } else {
+            console.log('No .env file found in current directory');
+          }
           
           // Install dependencies if package.json exists
           const packageJsonPath = `${repoDir}/package.json`;
