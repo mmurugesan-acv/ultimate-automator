@@ -38,6 +38,36 @@
       background-color: #e8f4f8;
       border-radius: 5px;
     }
+    .logs-container {
+      margin-top: 20px;
+      background-color: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .logs {
+      height: 300px;
+      overflow-y: auto;
+      background-color: #1e1e1e;
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 10px;
+      border-radius: 3px;
+    }
+    .log-entry {
+      margin-bottom: 5px;
+      word-wrap: break-word;
+    }
+    .log-timestamp {
+      color: #888;
+    }
+    .log-info {
+      color: #fff;
+    }
+    .log-error {
+      color: #ff6b6b;
+    }
     button {
       background-color: #007cba;
       color: white;
@@ -69,6 +99,13 @@
       <div class="status">
         <p><strong>Stream URL:</strong> http://localhost:3001/stream.mjpeg</p>
         <p><strong>Status:</strong> <span id="streamStatus">Loading...</span></p>
+      </div>
+    </div>
+
+    <div class="logs-container">
+      <h3>Server Logs</h3>
+      <div class="logs" id="logsContainer">
+        <div class="log-entry">Connecting to log stream...</div>
       </div>
     </div>
   </div>
@@ -145,6 +182,61 @@
     // Add some debug logging
     console.log('Stream HTML loaded');
     console.log('Stream URL:', streamImg.src);
+
+    // SSE connection for real-time logs
+    const logsContainer = document.getElementById('logsContainer');
+    let eventSource;
+
+    function connectToLogs() {
+      eventSource = new EventSource('http://localhost:3001/logs');
+      
+      eventSource.onopen = function() {
+        addLogEntry('Connected to server logs', 'info');
+      };
+
+      eventSource.onmessage = function(event) {
+        try {
+          const logData = JSON.parse(event.data);
+          addLogEntry(logData.message, logData.level, logData.timestamp);
+        } catch (error) {
+          console.error('Error parsing log data:', error);
+        }
+      };
+
+      eventSource.onerror = function() {
+        addLogEntry('Log connection error. Retrying...', 'error');
+        setTimeout(() => {
+          if (eventSource.readyState === EventSource.CLOSED) {
+            connectToLogs();
+          }
+        }, 5000);
+      };
+    }
+
+    function addLogEntry(message, level = 'info', timestamp = null) {
+      const logEntry = document.createElement('div');
+      logEntry.className = 'log-entry';
+      
+      const time = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+      
+      logEntry.innerHTML = `
+        <span class="log-timestamp">[${time}]</span>
+        <span class="log-${level}">${message}</span>
+      `;
+      
+      logsContainer.appendChild(logEntry);
+      
+      // Auto-scroll to bottom
+      logsContainer.scrollTop = logsContainer.scrollHeight;
+      
+      // Keep only last 100 log entries
+      while (logsContainer.children.length > 100) {
+        logsContainer.removeChild(logsContainer.firstChild);
+      }
+    }
+
+    // Connect to logs when page loads
+    connectToLogs();
   </script>
 </body>
 </html>

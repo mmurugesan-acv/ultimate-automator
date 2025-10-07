@@ -4,6 +4,68 @@ import fs from "fs";
 
 const app = express();
 
+// Log buffer to store recent logs
+const logBuffer = [];
+const MAX_LOG_BUFFER = 100;
+let sseClients = [];
+
+// Override console.log to capture logs
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+
+console.log = function(...args) {
+  const message = args.join(' ');
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: message
+  };
+  
+  logBuffer.push(logEntry);
+  if (logBuffer.length > MAX_LOG_BUFFER) {
+    logBuffer.shift();
+  }
+  
+  // Broadcast to SSE clients
+  broadcastToSSEClients(logEntry);
+  
+  originalConsoleLog.apply(console, args);
+};
+
+console.error = function(...args) {
+  const message = args.join(' ');
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level: 'error',
+    message: message
+  };
+  
+  logBuffer.push(logEntry);
+  if (logBuffer.length > MAX_LOG_BUFFER) {
+    logBuffer.shift();
+  }
+  
+  // Broadcast to SSE clients
+  broadcastToSSEClients(logEntry);
+  
+  originalConsoleError.apply(console, args);
+};
+
+function broadcastToSSEClients(logEntry) {
+  const data = JSON.stringify(logEntry);
+  sseClients.forEach(client => {
+    try {
+      client.write(`data: ${data}\n\n`);
+    } catch (error) {
+      // Remove dead clients
+      const index = sseClients.indexOf(client);
+      if (index > -1) {
+        sseClients.splice(index, 1);
+      }
+    }
+  });
+}
+
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -56,10 +118,6 @@ app.get("/stream.mjpeg", (req, res) => {
         res.write(data);
         res.write('\r\n');
       }
-    });
-
-    ffmpeg.stderr.on('data', (data) => {
-      const message = data.toString();
     });
 
     ffmpeg.on('error', (err) => {
@@ -259,5 +317,32 @@ function runTests(directory) {
     env: { ...process.env, DISPLAY: ":99" }
   });
 }
+
+// SSE endpoint for real-time logs
+app.get("/logs", (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+
+  // Send recent logs
+  logBuffer.forEach(log => {
+    res.write(`data: ${JSON.stringify(log)}\n\n`);
+  });
+
+  // Add client to list
+  sseClients.push(res);
+
+  // Remove client when connection closes
+  req.on('close', () => {
+    const index = sseClients.indexOf(res);
+    if (index > -1) {
+      sseClients.splice(index, 1);
+    }
+  });
+});
 
 app.listen(3000, () => console.log("Playwright server running on port 3000"));
