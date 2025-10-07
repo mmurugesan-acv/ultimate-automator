@@ -106,4 +106,24 @@ export class GitIntegrationController {
       req.body.repository,
     );
   }
+
+  @Post('create-pr')
+  async createPullRequest(
+    @Req()
+    req: Request & {
+      body: {
+        userId: string;
+        code: string;
+        title?: string;
+        description?: string;
+      };
+    },
+  ) {
+    return await this.gitIntegrationService.createPullRequest(
+      req.body.userId,
+      req.body.code,
+      req.body.title,
+      req.body.description,
+    );
+  }
 }
