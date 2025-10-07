@@ -310,11 +310,36 @@ function runTests(directory) {
   console.log(`Running tests in directory: ${directory}`);
   
   // Run Playwright tests specifically for ultimate_automator folder
-  const testCommand = `export DISPLAY=:99 && cd ${directory} && npx playwright test --headed`;
+  const testCommand = `export DISPLAY=:99 && cd ${directory} && npx playwright test ultimate_automator/UA_E2E.spec.js --headed`;
   
-  spawn("bash", ["-c", testCommand], { 
-    stdio: "inherit",
+  const testProcess = spawn("bash", ["-c", testCommand], { 
+    stdio: ['ignore', 'pipe', 'pipe'], // Changed from 'inherit' to 'pipe'
     env: { ...process.env, DISPLAY: ":99" }
+  });
+
+  // Capture and log stdout
+  testProcess.stdout.on('data', (data) => {
+    const output = data.toString();
+    console.log(`[Playwright] ${output.trim()}`);
+  });
+
+  // Capture and log stderr
+  testProcess.stderr.on('data', (data) => {
+    const output = data.toString();
+    console.error(`[Playwright Error] ${output.trim()}`);
+  });
+
+  // Handle process completion
+  testProcess.on('close', (code) => {
+    if (code === 0) {
+      console.log('✅ All tests completed successfully');
+    } else {
+      console.error(`❌ Tests failed with exit code: ${code}`);
+    }
+  });
+
+  testProcess.on('error', (error) => {
+    console.error(`Test process error: ${error.message}`);
   });
 }
 

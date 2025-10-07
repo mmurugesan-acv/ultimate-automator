@@ -11,7 +11,7 @@
       background-color: #f0f0f0;
     }
     .container {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
     }
     .controls {
@@ -20,6 +20,18 @@
       background-color: white;
       border-radius: 5px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .main-content {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .stream-section {
+      flex: 2;
+    }
+    .logs-section {
+      flex: 1;
+      min-width: 400px;
     }
     .stream-container {
       background-color: white;
@@ -39,19 +51,19 @@
       border-radius: 5px;
     }
     .logs-container {
-      margin-top: 20px;
       background-color: white;
       padding: 10px;
       border-radius: 5px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      height: fit-content;
     }
     .logs {
-      height: 300px;
+      height: 500px;
       overflow-y: auto;
       background-color: #1e1e1e;
       color: #ffffff;
       font-family: 'Courier New', monospace;
-      font-size: 12px;
+      font-size: 11px;
       padding: 10px;
       border-radius: 3px;
     }
@@ -94,18 +106,24 @@
       <span id="status">Ready</span>
     </div>
     
-    <div class="stream-container">
-      <img id="streamImg" src="http://localhost:3001/stream.mjpeg" width="800" alt="Live Stream">
-      <div class="status">
-        <p><strong>Stream URL:</strong> http://localhost:3001/stream.mjpeg</p>
-        <p><strong>Status:</strong> <span id="streamStatus">Loading...</span></p>
+    <div class="main-content">
+      <div class="stream-section">
+        <div class="stream-container">
+          <img id="streamImg" src="http://localhost:3001/stream.mjpeg" width="100%" alt="Live Stream">
+          <div class="status">
+            <p><strong>Stream URL:</strong> http://localhost:3001/stream.mjpeg</p>
+            <p><strong>Status:</strong> <span id="streamStatus">Loading...</span></p>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <div class="logs-container">
-      <h3>Server Logs</h3>
-      <div class="logs" id="logsContainer">
-        <div class="log-entry">Connecting to log stream...</div>
+      <div class="logs-section">
+        <div class="logs-container">
+          <h3>Server Logs</h3>
+          <div class="logs" id="logsContainer">
+            <div class="log-entry">Connecting to log stream...</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
