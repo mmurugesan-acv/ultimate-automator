@@ -114,7 +114,7 @@ function handleGitHubAuth() {
     if (event.data.type === 'GITHUB_AUTH_SUCCESS') {
       const { token, user } = event.data.data
       
-      chrome.storage.local.set({ githubToken: token }, async () => {
+      chrome.storage.local.set({ githubToken: token, githubUserId: user.id }, async () => {
         githubUser.value = user
         githubToken.value = token
         isGithubAuthenticated.value = true
