@@ -20,7 +20,7 @@ import * as monaco from 'monaco-editor'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import LightDarkMode from '@/components/shared/light-dark-mode-changer/LightDarkMode.vue'
 import RaisePR from '@/components/RaisePR.vue'
-import { Button } from '@/components/ui/button'
+import TestRunner from '@/components/TestRunner.vue'
 
 const editorContainer = ref(null)
 let capturedData = null
@@ -29,8 +29,6 @@ const selectedType = ref('playwrite')
 const selectedView = ref('javascript')
 const generatedCode = ref('')
 const isLoading = ref(true)
-const showOverlay = ref(false)
-const overlayVisible = ref(false)
 
 onMounted(() => {
   chrome.storage.local.get('data', result => {
@@ -105,52 +103,6 @@ function getEditorValue() {
     return editorInstance.getValue()
   }
   return ''
-}
-
-function runTest() {
-  // Get the current editor value (including any user modifications)
-  const currentEditorValue = getEditorValue()
-  console.log('Current editor content:', currentEditorValue)
-
-  async function triggerTest(userId) {
-    const response = await fetch('http://localhost:3000/api/run-tests', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        content: currentEditorValue, // Use actual editor content
-        target: "playwrite",
-        language: "javascript",
-        userId
-      })
-    })
-
-    const result = await response.json()
-    console.log("Streaming output...", result)
-  }
-
-  chrome.storage.local.get('githubUserId', result => {
-    triggerTest(result.githubUserId)
-  })
-
-
-
-
-  showOverlay.value = true
-  overlayVisible.value = false // Ensure it starts hidden
-  // Use setTimeout to allow DOM to render the initial state
-  setTimeout(() => {
-    overlayVisible.value = true
-  }, 10) // Small delay to trigger animation
-}
-
-function closeOverlay() {
-  overlayVisible.value = false
-  // Wait for animation to complete before hiding the overlay
-  setTimeout(() => {
-    showOverlay.value = false
-  }, 500) // Match the transition duration
 }
 </script>
 
@@ -270,8 +222,9 @@ function closeOverlay() {
           </div>
         </div>
 
-        <!-- Right: Theme Toggle and Raise PR -->
+        <!-- Right: Run Test, Raise PR, and Theme Toggle -->
         <div class="flex items-center gap-3">
+          <TestRunner :editorInstance="editorInstance" />
           <RaisePR :editorInstance="editorInstance" />
           <LightDarkMode />
         </div>
@@ -283,66 +236,6 @@ function closeOverlay() {
         <div class="flex flex-col w-[100%]">
           <div class="flex-1 border overflow-hidden relative">
             <div ref="editorContainer" class="h-full"></div>
-
-            <!-- Overlay Button with shadcn/vue and custom SVG icon -->
-            <Button
-              @click="runTest"
-              variant="default"
-              size="sm"
-              class="absolute top-3 right-10 z-10 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 border-0"
-            >
-              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-              Run Test
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Overlay -->
-    <div v-if="showOverlay">
-      <!-- Invisible clickable area for the 10% left area to close overlay -->
-      <div class="fixed inset-y-0 left-0 w-[10%] z-40" @click="closeOverlay"></div>
-
-      <!-- Sliding panel -->
-      <div
-        class="fixed inset-y-0 right-0 w-[90%] z-50 shadow-xl transform transition-transform duration-500 ease-in-out"
-        :class="overlayVisible ? 'translate-x-0' : 'translate-x-full'" style="background-color: #282c34;" @click.stop>
-        <!-- Close Button -->
-        <button @click="closeOverlay" class="absolute top-4 right-4 z-10 p-2 rounded-full transition-colors"
-          style="color: #abb2bf; background-color: #3e4451; border: 1px solid #3e4451;"
-          onmouseover="this.style.backgroundColor='#4e5563'" onmouseout="this.style.backgroundColor='#3e4451'">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <!-- Overlay Content -->
-        <div class="flex h-full">
-          <!-- Left Section (60%) -->
-          <div class="w-3/5 p-6 border-r" style="border-color: #3e4451;">
-            <h2 class="text-xl mb-4" style="color: #abb2bf;">Test Stream</h2>
-            <img id="streamImg" src="http://localhost:3001/stream.mjpeg" width="100%" alt="Live Stream">
-          </div>
-
-          <!-- Right Section (40%) -->
-          <div class="w-2/5 p-6">
-            <h2 class="text-xl mb-4" style="color: #abb2bf;">Console Output</h2>
-            <div class="bg-black text-green-400 p-4 rounded-lg h-96 overflow-y-auto font-mono text-sm">
-              <div class="space-y-1">
-                <div>$ playwright test</div>
-                <div class="text-gray-500">[2024-10-07 14:30:15] Starting test execution...</div>
-                <div class="text-blue-400">[INFO] Launching browser: chromium</div>
-                <div class="text-blue-400">[INFO] Navigating to: https://example.com</div>
-                <div class="text-green-400">[PASS] ✓ Login form validation (2.1s)</div>
-                <div class="text-green-400">[PASS] ✓ Button click interaction (1.8s)</div>
-                <div class="text-yellow-400">[RUNNING] Form submission test...</div>
-                <div class="text-gray-500">Waiting for element: button[type="submit"]</div>
-                <div class="animate-pulse">▊</div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
