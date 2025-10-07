@@ -19,9 +19,6 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-const TEST_FOLDER = "tests/external";
-if (!fs.existsSync(TEST_FOLDER)) fs.mkdirSync(TEST_FOLDER, { recursive: true });
-
 app.get("/stream.mjpeg", (req, res) => {
   console.log("New client connected to MJPEG stream");
   
@@ -34,7 +31,7 @@ app.get("/stream.mjpeg", (req, res) => {
   });
 
   setTimeout(() => {
-    console.log("Starting FFmpeg for display :99");
+    console.log("Starting streaming service");
     
     const ffmpeg = spawn("ffmpeg", [
       "-f", "x11grab",
@@ -63,11 +60,10 @@ app.get("/stream.mjpeg", (req, res) => {
 
     ffmpeg.stderr.on('data', (data) => {
       const message = data.toString();
-      console.log("FFmpeg stderr:", message);
     });
 
     ffmpeg.on('error', (err) => {
-      console.error('FFmpeg error:', err);
+      console.error('Stream service got disconneted:', err);
       isActive = false;
       if (!res.destroyed) {
         res.end();
@@ -102,30 +98,6 @@ app.get("/stream.mjpeg", (req, res) => {
   }, 3000);
 });
 
-app.get("/debug", (req, res) => {
-  const { spawn } = require("child_process");
-  const xdpyinfo = spawn("xdpyinfo", ["-display", ":99"]);
-  
-  let output = "";
-  let error = "";
-  
-  xdpyinfo.stdout.on("data", (data) => {
-    output += data.toString();
-  });
-  
-  xdpyinfo.stderr.on("data", (data) => {
-    error += data.toString();
-  });
-  
-  xdpyinfo.on("close", (code) => {
-    res.json({
-      displayStatus: code === 0 ? "Display :99 is active" : "Display :99 not found",
-      exitCode: code,
-      output: output.substring(0, 500), // Limit output
-      error: error.substring(0, 500)
-    });
-  });
-});
 
 app.post("/run-script", async (req, res) => {
   const { repository, githubToken, testConfig } = req.body;
@@ -187,6 +159,9 @@ app.post("/run-script", async (req, res) => {
             console.log('No .env file found in current directory');
           }
           
+          // Create ultimate_automator folder and test file with provided code
+          createTestFile(repoDir, testConfig);
+          
           // Install dependencies if package.json exists
           const packageJsonPath = `${repoDir}/package.json`;
           if (fs.existsSync(packageJsonPath)) {
@@ -213,12 +188,12 @@ app.post("/run-script", async (req, res) => {
                   } else {
                     console.log('Playwright browser install failed, but continuing...');
                   }
-                  runTests(repoDir, testConfig);
+                  runTests(repoDir);
                 });
 
                 playwrightInstall.on("error", (error) => {
                   console.error('Playwright install error:', error);
-                  runTests(repoDir, testConfig);
+                  runTests(repoDir);
                 });
               } else {
                 console.error('Failed to install dependencies');
@@ -226,7 +201,6 @@ app.post("/run-script", async (req, res) => {
             });
           } else {
             console.log('No package.json found, running tests directly');
-            runTests(repoDir, testConfig);
           }
         } else {
           console.error('Failed to clone repository, exit code:', code);
@@ -239,17 +213,45 @@ app.post("/run-script", async (req, res) => {
     } else {
       // Fallback to default repository
       console.log('No repository specified, using default');
-      runTests('playwright-basic-demo', testConfig);
     }
   } catch (error) {
     console.error('Error in run-script:', error);
   }
 });
 
-function runTests(directory, testConfig) {
+function createTestFile(directory, testConfig) {
+  try {
+    // Create ultimate_automator folder
+    const testFolderPath = `${directory}/ultimate_automator`;
+    if (!fs.existsSync(testFolderPath)) {
+      fs.mkdirSync(testFolderPath, { recursive: true });
+      console.log('Created ultimate_automator folder');
+    }
+    
+    // Create UA_E2E.spec.js file with the test code
+    const testFilePath = `${testFolderPath}/UA_E2E.spec.js`;
+    
+    let testCode = '';
+    if (testConfig && testConfig.code) {
+      // Use provided code and replace \n with actual newlines
+      testCode = testConfig.code.replace(/\\n/g, '\n');
+    } else {
+      return;
+    }
+    
+    fs.writeFileSync(testFilePath, testCode, 'utf8');
+    console.log(`Created test file: ${testFilePath}`);
+    console.log('Test code written successfully');
+    
+  } catch (error) {
+    console.error('Error creating test file:', error);
+  }
+}
+
+function runTests(directory) {
   console.log(`Running tests in directory: ${directory}`);
   
-  // Run Playwright tests
+  // Run Playwright tests specifically for ultimate_automator folder
   const testCommand = `export DISPLAY=:99 && cd ${directory} && npx playwright test --headed`;
   
   spawn("bash", ["-c", testCommand], { 
