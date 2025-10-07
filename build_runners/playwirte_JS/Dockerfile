@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY . .
 
-# Install dotenv to load .env files
-RUN npm install dotenv
+RUN npm install
 
 CMD ["bash", "-c", "Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +render -noreset & node server.js"]

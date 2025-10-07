@@ -1,9 +1,70 @@
-import 'dotenv/config';
 import express from "express";
 import { spawn } from "child_process";
 import fs from "fs";
 
 const app = express();
+
+// Log buffer to store recent logs
+const logBuffer = [];
+const MAX_LOG_BUFFER = 100;
+let sseClients = [];
+
+// Override console.log to capture logs
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+
+console.log = function(...args) {
+  const message = args.join(' ');
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level: 'info',
+    message: message
+  };
+  
+  logBuffer.push(logEntry);
+  if (logBuffer.length > MAX_LOG_BUFFER) {
+    logBuffer.shift();
+  }
+  
+  // Broadcast to SSE clients
+  broadcastToSSEClients(logEntry);
+  
+  originalConsoleLog.apply(console, args);
+};
+
+console.error = function(...args) {
+  const message = args.join(' ');
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level: 'error',
+    message: message
+  };
+  
+  logBuffer.push(logEntry);
+  if (logBuffer.length > MAX_LOG_BUFFER) {
+    logBuffer.shift();
+  }
+  
+  // Broadcast to SSE clients
+  broadcastToSSEClients(logEntry);
+  
+  originalConsoleError.apply(console, args);
+};
+
+function broadcastToSSEClients(logEntry) {
+  const data = JSON.stringify(logEntry);
+  sseClients.forEach(client => {
+    try {
+      client.write(`data: ${data}\n\n`);
+    } catch (error) {
+      // Remove dead clients
+      const index = sseClients.indexOf(client);
+      if (index > -1) {
+        sseClients.splice(index, 1);
+      }
+    }
+  });
+}
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -20,9 +81,6 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-const TEST_FOLDER = "tests/external";
-if (!fs.existsSync(TEST_FOLDER)) fs.mkdirSync(TEST_FOLDER, { recursive: true });
-
 app.get("/stream.mjpeg", (req, res) => {
   console.log("New client connected to MJPEG stream");
   
@@ -35,7 +93,7 @@ app.get("/stream.mjpeg", (req, res) => {
   });
 
   setTimeout(() => {
-    console.log("Starting FFmpeg for display :99");
+    console.log("Starting streaming service");
     
     const ffmpeg = spawn("ffmpeg", [
       "-f", "x11grab",
@@ -62,13 +120,8 @@ app.get("/stream.mjpeg", (req, res) => {
       }
     });
 
-    ffmpeg.stderr.on('data', (data) => {
-      const message = data.toString();
-      console.log("FFmpeg stderr:", message);
-    });
-
     ffmpeg.on('error', (err) => {
-      console.error('FFmpeg error:', err);
+      console.error('Stream service got disconneted:', err);
       isActive = false;
       if (!res.destroyed) {
         res.end();
@@ -103,30 +156,6 @@ app.get("/stream.mjpeg", (req, res) => {
   }, 3000);
 });
 
-app.get("/debug", (req, res) => {
-  const { spawn } = require("child_process");
-  const xdpyinfo = spawn("xdpyinfo", ["-display", ":99"]);
-  
-  let output = "";
-  let error = "";
-  
-  xdpyinfo.stdout.on("data", (data) => {
-    output += data.toString();
-  });
-  
-  xdpyinfo.stderr.on("data", (data) => {
-    error += data.toString();
-  });
-  
-  xdpyinfo.on("close", (code) => {
-    res.json({
-      displayStatus: code === 0 ? "Display :99 is active" : "Display :99 not found",
-      exitCode: code,
-      output: output.substring(0, 500), // Limit output
-      error: error.substring(0, 500)
-    });
-  });
-});
 
 app.post("/run-script", async (req, res) => {
   const { repository, githubToken, testConfig } = req.body;
@@ -173,6 +202,24 @@ app.post("/run-script", async (req, res) => {
         if (code === 0) {
           console.log('Repository cloned successfully');
           
+          // Copy .env file to cloned repository if it exists
+          const envSourcePath = '.env';
+          const envDestPath = `${repoDir}/.env`;
+          
+          if (fs.existsSync(envSourcePath)) {
+            try {
+              fs.copyFileSync(envSourcePath, envDestPath);
+              console.log('.env file copied to cloned repository');
+            } catch (error) {
+              console.error('Failed to copy .env file:', error);
+            }
+          } else {
+            console.log('No .env file found in current directory');
+          }
+          
+          // Create ultimate_automator folder and test file with provided code
+          createTestFile(repoDir, testConfig);
+          
           // Install dependencies if package.json exists
           const packageJsonPath = `${repoDir}/package.json`;
           if (fs.existsSync(packageJsonPath)) {
@@ -199,12 +246,12 @@ app.post("/run-script", async (req, res) => {
                   } else {
                     console.log('Playwright browser install failed, but continuing...');
                   }
-                  runTests(repoDir, testConfig);
+                  runTests(repoDir);
                 });
 
                 playwrightInstall.on("error", (error) => {
                   console.error('Playwright install error:', error);
-                  runTests(repoDir, testConfig);
+                  runTests(repoDir);
                 });
               } else {
                 console.error('Failed to install dependencies');
@@ -212,7 +259,6 @@ app.post("/run-script", async (req, res) => {
             });
           } else {
             console.log('No package.json found, running tests directly');
-            runTests(repoDir, testConfig);
           }
         } else {
           console.error('Failed to clone repository, exit code:', code);
@@ -225,23 +271,103 @@ app.post("/run-script", async (req, res) => {
     } else {
       // Fallback to default repository
       console.log('No repository specified, using default');
-      runTests('playwright-basic-demo', testConfig);
     }
   } catch (error) {
     console.error('Error in run-script:', error);
   }
 });
 
-function runTests(directory, testConfig) {
+function createTestFile(directory, testConfig) {
+  try {
+    // Create ultimate_automator folder
+    const testFolderPath = `${directory}/ultimate_automator`;
+    if (!fs.existsSync(testFolderPath)) {
+      fs.mkdirSync(testFolderPath, { recursive: true });
+      console.log('Created ultimate_automator folder');
+    }
+    
+    // Create UA_E2E.spec.js file with the test code
+    const testFilePath = `${testFolderPath}/UA_E2E.spec.js`;
+    
+    let testCode = '';
+    if (testConfig && testConfig.code) {
+      // Use provided code and replace \n with actual newlines
+      testCode = testConfig.code.replace(/\\n/g, '\n');
+    } else {
+      return;
+    }
+    
+    fs.writeFileSync(testFilePath, testCode, 'utf8');
+    console.log(`Created test file: ${testFilePath}`);
+    console.log('Test code written successfully');
+    
+  } catch (error) {
+    console.error('Error creating test file:', error);
+  }
+}
+
+function runTests(directory) {
   console.log(`Running tests in directory: ${directory}`);
   
-  // Run Playwright tests
-  const testCommand = `export DISPLAY=:99 && cd ${directory} && npx playwright test --headed`;
+  // Run Playwright tests specifically for ultimate_automator folder
+  const testCommand = `export DISPLAY=:99 && cd ${directory} && npx playwright test ultimate_automator/UA_E2E.spec.js --headed`;
   
-  spawn("bash", ["-c", testCommand], { 
-    stdio: "inherit",
+  const testProcess = spawn("bash", ["-c", testCommand], { 
+    stdio: ['ignore', 'pipe', 'pipe'], // Changed from 'inherit' to 'pipe'
     env: { ...process.env, DISPLAY: ":99" }
   });
+
+  // Capture and log stdout
+  testProcess.stdout.on('data', (data) => {
+    const output = data.toString();
+    console.log(`[Playwright] ${output.trim()}`);
+  });
+
+  // Capture and log stderr
+  testProcess.stderr.on('data', (data) => {
+    const output = data.toString();
+    console.error(`[Playwright Error] ${output.trim()}`);
+  });
+
+  // Handle process completion
+  testProcess.on('close', (code) => {
+    if (code === 0) {
+      console.log('✅ All tests completed successfully');
+    } else {
+      console.error(`❌ Tests failed with exit code: ${code}`);
+    }
+  });
+
+  testProcess.on('error', (error) => {
+    console.error(`Test process error: ${error.message}`);
+  });
 }
+
+// SSE endpoint for real-time logs
+app.get("/logs", (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+
+  // Send recent logs
+  logBuffer.forEach(log => {
+    res.write(`data: ${JSON.stringify(log)}\n\n`);
+  });
+
+  // Add client to list
+  sseClients.push(res);
+
+  // Remove client when connection closes
+  req.on('close', () => {
+    const index = sseClients.indexOf(res);
+    if (index > -1) {
+      sseClients.splice(index, 1);
+    }
+  });
+});
 
 app.listen(3000, () => console.log("Playwright server running on port 3000"));
