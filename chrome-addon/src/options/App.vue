@@ -19,6 +19,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import * as monaco from 'monaco-editor'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import LightDarkMode from '@/components/shared/light-dark-mode-changer/LightDarkMode.vue'
+import RaisePR from '@/components/RaisePR.vue'
 
 const editorContainer = ref(null)
 let capturedData = null
@@ -76,28 +77,19 @@ async function generateCode() {
 }
 
 function initializeEditor() {
-  monaco.editor.defineTheme('onedark-pro', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: [
-      { token: 'comment', foreground: '5c6370', fontStyle: 'italic' },
-      { token: 'string', foreground: '98c379' },
-      { token: 'keyword', foreground: 'c678dd' },
-      { token: 'number', foreground: 'd19a66' },
-    ],
-    colors: {
-      'editor.background': '#282c34',
-      'editor.foreground': '#abb2bf',
-      'editor.lineHighlightBackground': '#2c313c',
-      'editor.selectionBackground': '#3e4451',
-    },
-  })
+  monaco.editor.defineTheme('default', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+      ],
+      colors: {}
+      });
+  monaco.editor.setTheme('default')
 
   // Store the editor instance so we can access its value
   editorInstance = monaco.editor.create(editorContainer.value, {
     value: generatedCode.value || 'No code generated yet',
     language: 'javascript',
-    theme: 'onedark-pro',
     automaticLayout: true,
     minimap: { enabled: false },
     fontSize: 15,
@@ -277,8 +269,11 @@ function closeOverlay() {
           </div>
         </div>
 
-        <!-- Right: Theme Toggle -->
-        <LightDarkMode />
+        <!-- Right: Theme Toggle and Raise PR -->
+        <div class="flex items-center gap-3">
+          <RaisePR :editorInstance="editorInstance" />
+          <LightDarkMode />
+        </div>
       </div>
 
       <!-- Main Editor Section -->
