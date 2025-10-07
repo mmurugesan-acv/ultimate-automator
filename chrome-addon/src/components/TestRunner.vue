@@ -76,10 +76,11 @@ async function runTest() {
       </Button>
     </SheetTrigger>
 
-    <!-- Sheet Content -->
+    <!-- Sheet Content with full width -->
     <SheetContent 
       side="right" 
-      class="flex flex-col p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right duration-300"
+      class="!w-[90vw] !max-w-none flex flex-col p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right duration-500"
+      style="width: 90vw !important; max-width: none !important;"
     >
       <!-- Header -->
       <SheetHeader class="p-6 border-b bg-muted/20">
@@ -98,8 +99,8 @@ async function runTest() {
 
       <!-- Content -->
       <div class="flex-1 flex overflow-hidden">
-        <!-- Left Section - Video Stream (60%) -->
-        <div class="flex-[3] border-r border-border">
+        <!-- Left Section - Video Stream (65%) -->
+        <div class="w-[65%] border-r border-border">
           <div class="p-6 h-full flex flex-col">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">Live Test Stream</h3>
@@ -119,7 +120,7 @@ async function runTest() {
                 src="http://localhost:3001/stream.mjpeg" 
                 alt="Live Test Stream"
                 class="w-full h-full object-contain"
-                style="min-height: 400px;"
+                style="min-height: 500px;"
               />
             </div>
             
@@ -131,8 +132,8 @@ async function runTest() {
           </div>
         </div>
 
-        <!-- Right Section - Console Output (40%) -->
-        <div class="flex-[2]">
+        <!-- Right Section - Console Output (35%) -->
+        <div class="w-[35%]">
           <div class="p-6 h-full flex flex-col">
             <h3 class="text-lg font-semibold mb-4">Console Output</h3>
             
@@ -185,3 +186,16 @@ async function runTest() {
     </SheetContent>
   </Sheet>
 </template>
+
+<style scoped>
+/* Force override shadcn sheet width constraints */
+:deep([data-radix-dialog-content]) {
+  width: 95vw !important;
+  max-width: none !important;
+}
+
+:deep(.sheet-content) {
+  width: 95vw !important;
+  max-width: none !important;
+}
+</style>
