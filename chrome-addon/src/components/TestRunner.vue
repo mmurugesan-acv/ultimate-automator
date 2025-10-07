@@ -1,5 +1,5 @@
 <script setup>
-import { ref, defineProps } from 'vue'
+import { ref, defineProps, onUnmounted, nextTick } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
@@ -9,14 +9,9 @@ const props = defineProps({
 
 const isOpen = ref(false)
 const isRunning = ref(false)
-
-function openTestRunner() {
-  isOpen.value = true
-}
-
-function closeTestRunner() {
-  isOpen.value = false
-}
+const logs = ref([])
+const streamStatus = ref('disconnected')
+let eventSource = null
 
 async function runTest() {
   if (!props.editorInstance) {
@@ -57,14 +52,104 @@ async function runTest() {
     isRunning.value = false
   }
 }
+
+function connectToLogs() {
+  if (eventSource) {
+    eventSource.close()
+  }
+
+  // Connect to the NestJS proxy endpoint for logs
+  eventSource = new EventSource('http://localhost:3000/api/logs')
+  
+  eventSource.onopen = function() {
+    addLogEntry('Connected to server logs', 'info')
+    streamStatus.value = 'connected'
+  }
+
+  eventSource.onmessage = function(event) {
+    try {
+      const logData = JSON.parse(event.data)
+      addLogEntry(logData.message, logData.level, logData.timestamp)
+    } catch (error) {
+      console.error('Error parsing log data:', error)
+      addLogEntry('Error parsing log data', 'error')
+    }
+  }
+
+  eventSource.onerror = function() {
+    addLogEntry('Log connection error. Retrying...', 'error')
+    streamStatus.value = 'error'
+    setTimeout(() => {
+      if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+        connectToLogs()
+      }
+    }, 5000)
+  }
+}
+
+function addLogEntry(message, level = 'info', timestamp = null) {
+  const time = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()
+  logs.value.push({ time, level, message })
+  
+  // Keep only last 100 log entries
+  if (logs.value.length > 100) {
+    logs.value.shift()
+  }
+
+  // Auto-scroll to bottom - need to use nextTick for DOM update
+  nextTick(() => {
+    const logsContainer = document.getElementById('logsContainer')
+    if (logsContainer) {
+      logsContainer.scrollTop = logsContainer.scrollHeight
+    }
+  })
+}
+
+function clearLogs() {
+  logs.value = []
+  addLogEntry('Logs cleared', 'info')
+}
+
+function downloadLogs() {
+  const logText = logs.value.map(log => `[${log.time}] ${log.level.toUpperCase()}: ${log.message}`).join('\n')
+  const blob = new Blob([logText], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `playwright-logs-${new Date().toISOString().split('T')[0]}.txt`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// Connect to logs when sheet opens, disconnect when closes
+function handleSheetOpenChange(open) {
+  isOpen.value = open
+  if (open) {
+    connectToLogs()
+  } else {
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
+    streamStatus.value = 'disconnected'
+  }
+}
+
+onUnmounted(() => {
+  if (eventSource) {
+    eventSource.close()
+  }
+})
 </script>
 
 <template>
-  <Sheet v-model:open="isOpen">
+  <Sheet :open="isOpen" @update:open="handleSheetOpenChange">
     <!-- Trigger Button -->
     <SheetTrigger as-child>
       <Button 
-        @click="openTestRunner"
+        @click="() => handleSheetOpenChange(true)"
         variant="default"
         size="sm"
         class="flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 border-0"
@@ -79,8 +164,8 @@ async function runTest() {
     <!-- Sheet Content with full width -->
     <SheetContent 
       side="right" 
-      class="!w-[90vw] !max-w-none flex flex-col p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right duration-500"
-      style="width: 90vw !important; max-width: none !important;"
+      class="!w-[95vw] !max-w-none flex flex-col p-0"
+      style="width: 95vw !important; max-width: none !important;"
     >
       <!-- Header -->
       <SheetHeader class="p-6 border-b bg-muted/20">
@@ -91,6 +176,14 @@ async function runTest() {
             </svg>
           </div>
           Test Execution Dashboard
+          <span :class="[
+            'px-2 py-1 text-xs rounded-full',
+            streamStatus === 'connected' ? 'bg-green-100 text-green-800' : 
+            streamStatus === 'error' ? 'bg-red-100 text-red-800' : 
+            'bg-gray-100 text-gray-800'
+          ]">
+            {{ streamStatus }}
+          </span>
         </SheetTitle>
         <SheetDescription class="text-sm text-muted-foreground">
           Monitor your test execution in real-time with live streaming and console output
@@ -135,37 +228,45 @@ async function runTest() {
         <!-- Right Section - Console Output (35%) -->
         <div class="w-[35%]">
           <div class="p-6 h-full flex flex-col">
-            <h3 class="text-lg font-semibold mb-4">Console Output</h3>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold">Console Output</h3>
+              <span class="text-sm text-muted-foreground">{{ logs.length }} logs</span>
+            </div>
             
             <div class="flex-1 bg-black rounded-lg p-4 overflow-hidden">
               <div 
                 id="logsContainer"
                 class="h-full overflow-y-auto text-green-400 font-mono text-sm space-y-1"
               >
-                <div class="text-gray-500">$ playwright test</div>
-                <div class="text-gray-500">[2024-10-07 14:30:15] Starting test execution...</div>
-                <div class="text-blue-400">[INFO] Launching browser: chromium</div>
-                <div class="text-blue-400">[INFO] Navigating to: https://example.com</div>
-                <div class="text-green-400">[PASS] ✓ Login form validation (2.1s)</div>
-                <div class="text-green-400">[PASS] ✓ Button click interaction (1.8s)</div>
-                <div class="text-yellow-400">[RUNNING] Form submission test...</div>
-                <div class="text-gray-500">Waiting for element: button[type="submit"]</div>
-                <div class="animate-pulse">▊</div>
+                <div v-for="(log, index) in logs" :key="index" class="log-entry">
+                  <span class="text-gray-500 text-xs">[{{ log.time }}]</span>
+                  <span :class="{
+                    'text-white': log.level === 'info',
+                    'text-red-400': log.level === 'error',
+                    'text-yellow-400': log.level === 'warn',
+                    'text-blue-400': log.level === 'debug',
+                    'text-green-400': log.level === 'success'
+                  }"> {{ log.message }}</span>
+                </div>
+                <div v-if="logs.length === 0" class="text-gray-500 text-center py-8">
+                  <div>Connecting to log stream...</div>
+                  <div class="animate-pulse mt-2">▊</div>
+                </div>
               </div>
             </div>
             
             <div class="mt-4 flex gap-2">
-              <Button variant="outline" size="sm" class="flex-1">
+              <Button @click="clearLogs" variant="outline" size="sm" class="flex-1">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7" />
                 </svg>
-                Clear Logs
+                Clear
               </Button>
-              <Button variant="outline" size="sm" class="flex-1">
+              <Button @click="downloadLogs" variant="outline" size="sm" class="flex-1">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Download Logs
+                Download
               </Button>
             </div>
           </div>
@@ -178,7 +279,7 @@ async function runTest() {
           <div class="text-sm text-muted-foreground">
             Test execution powered by Playwright in Docker container
           </div>
-          <Button @click="closeTestRunner" variant="outline">
+          <Button @click="() => handleSheetOpenChange(false)" variant="outline">
             Close
           </Button>
         </div>
@@ -197,5 +298,11 @@ async function runTest() {
 :deep(.sheet-content) {
   width: 95vw !important;
   max-width: none !important;
+}
+
+.log-entry {
+  margin-bottom: 4px;
+  word-wrap: break-word;
+  line-height: 1.4;
 }
 </style>
