@@ -201,14 +201,18 @@ function closeOverlay() {
       
       <!-- Sliding panel -->
       <div 
-        class="fixed inset-y-0 right-0 w-[90%] z-50 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-500 ease-in-out"
+        class="fixed inset-y-0 right-0 w-[90%] z-50 shadow-xl transform transition-transform duration-500 ease-in-out"
         :class="overlayVisible ? 'translate-x-0' : 'translate-x-full'"
+        style="background-color: #282c34;"
         @click.stop
       >
         <!-- Close Button -->
         <button 
           @click="closeOverlay"
-          class="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          class="absolute top-4 right-4 z-10 p-2 rounded-full transition-colors"
+          style="color: #abb2bf; background-color: #3e4451; border: 1px solid #3e4451;"
+          onmouseover="this.style.backgroundColor='#4e5563'"
+          onmouseout="this.style.backgroundColor='#3e4451'"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -218,13 +222,13 @@ function closeOverlay() {
         <!-- Overlay Content -->
         <div class="flex h-full">
           <!-- Left Section (60%) -->
-          <div class="w-3/5 p-6 border-r border-gray-200 dark:border-gray-700">
-            <h2 class="text-xl mb-4">Test Stream</h2>
+          <div class="w-3/5 p-6 border-r" style="border-color: #3e4451;">
+            <h2 class="text-xl mb-4" style="color: #abb2bf;">Test Stream</h2>
           </div>
 
           <!-- Right Section (40%) -->
           <div class="w-2/5 p-6">
-            <h2 class="text-xl mb-4">Console Output</h2>
+            <h2 class="text-xl mb-4" style="color: #abb2bf;">Console Output</h2>
             <div class="bg-black text-green-400 p-4 rounded-lg h-96 overflow-y-auto font-mono text-sm">
               <div class="space-y-1">
                 <div>$ playwright test</div>
