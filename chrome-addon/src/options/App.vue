@@ -20,6 +20,7 @@ import * as monaco from 'monaco-editor'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import LightDarkMode from '@/components/shared/light-dark-mode-changer/LightDarkMode.vue'
 import RaisePR from '@/components/RaisePR.vue'
+import { Button } from '@/components/ui/button'
 
 const editorContainer = ref(null)
 let capturedData = null
@@ -283,16 +284,18 @@ function closeOverlay() {
           <div class="flex-1 border overflow-hidden relative">
             <div ref="editorContainer" class="h-full"></div>
 
-            <!-- Overlay Button -->
-            <button @click="runTest"
-              class="absolute top-3 right-10 z-10 px-3 py-1.5 text-sm font-medium shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-              style="background-color: #282c34; color: #abb2bf; border: 1px solid #3e4451;">
-              <svg class="w-3 h-3 mr-1.5 inline-block" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+            <!-- Overlay Button with shadcn/vue and custom SVG icon -->
+            <Button
+              @click="runTest"
+              variant="default"
+              size="sm"
+              class="absolute top-3 right-10 z-10 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 border-0"
+            >
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
               </svg>
               Run Test
-            </button>
+            </Button>
           </div>
         </div>
       </div>
