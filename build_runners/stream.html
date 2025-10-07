@@ -206,7 +206,7 @@
     let eventSource;
 
     function connectToLogs() {
-      eventSource = new EventSource('http://localhost:3001/logs');
+      eventSource = new EventSource('http://localhost:3000/api/logs');
       
       eventSource.onopen = function() {
         addLogEntry('Connected to server logs', 'info');
