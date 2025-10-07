@@ -196,7 +196,7 @@ app.post("/run-script", async (req, res) => {
         "clone",
         cloneUrl,
         repoDir
-      ], { stdio: "inherit" });
+      ], { stdio: ['ignore', 'pipe', 'pipe'], });
 
       cloneProcess.on("close", (code) => {
         if (code === 0) {
@@ -226,33 +226,13 @@ app.post("/run-script", async (req, res) => {
             console.log('Installing dependencies...');
             const npmInstall = spawn("npm", ["install"], { 
               cwd: repoDir,
-              stdio: "inherit" 
+              stdio: ['ignore', 'pipe', 'pipe'],
             });
 
             npmInstall.on("close", (installCode) => {
               if (installCode === 0) {
                 console.log('Dependencies installed successfully');
-                
-                // Install Playwright browsers for the cloned repo
-                console.log('Installing Playwright browsers for cloned repository...');
-                const playwrightInstall = spawn("npx", ["playwright", "install"], { 
-                  cwd: repoDir,
-                  stdio: "inherit" 
-                });
-
-                playwrightInstall.on("close", (browserInstallCode) => {
-                  if (browserInstallCode === 0) {
-                    console.log('Playwright browsers installed successfully');
-                  } else {
-                    console.log('Playwright browser install failed, but continuing...');
-                  }
-                  runTests(repoDir);
-                });
-
-                playwrightInstall.on("error", (error) => {
-                  console.error('Playwright install error:', error);
-                  runTests(repoDir);
-                });
+                runTests(repoDir);
               } else {
                 console.error('Failed to install dependencies');
               }

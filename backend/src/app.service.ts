@@ -105,7 +105,7 @@ export class AppService {
           testConfig: {
             target,
             language,
-            content,
+            code: content,
           },
         }),
       });
