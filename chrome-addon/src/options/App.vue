@@ -15,7 +15,7 @@ self.MonacoEnvironment = {
   }
 }
 
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick, computed, watch } from 'vue'
 import * as monaco from 'monaco-editor'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import LightDarkMode from '@/components/shared/light-dark-mode-changer/LightDarkMode.vue'
@@ -29,6 +29,47 @@ const selectedType = ref('playwrite')
 const selectedView = ref('javascript')
 const generatedCode = ref('')
 const isLoading = ref(true)
+
+// Language mapping for different frameworks
+const languageMappings = {
+  playwrite: ['javascript', 'python', 'java', 'c_sharp'],
+  cypress: ['javascript'],
+  selenium: ['python'],
+  puppeteer: ['javascript']
+}
+
+// Display names for better UX
+const frameworkDisplayNames = {
+  playwrite: 'Playwright',
+  cypress: 'Cypress', 
+  selenium: 'Selenium',
+  puppeteer: 'Puppeteer'
+}
+
+const languageDisplayNames = {
+  javascript: 'JavaScript',
+  python: 'Python',
+  java: 'Java',
+  c_sharp: 'C#',
+}
+
+// Computed property for available languages based on selected framework
+const availableLanguages = computed(() => {
+  return languageMappings[selectedType.value] || []
+})
+
+// Watch for framework changes and reset language if not available
+const showOverlay = ref(false)
+const overlayVisible = ref(false)
+
+// Watch for framework type changes
+watch(selectedType, (newType) => {
+  const availableLangs = languageMappings[newType] || []
+  // If current language is not available for new framework, reset to first available
+  if (!availableLangs.includes(selectedView.value)) {
+    selectedView.value = availableLangs[0] || 'javascript'
+  }
+})
 
 onMounted(() => {
   chrome.storage.local.get('data', result => {
@@ -121,22 +162,6 @@ function getEditorValue() {
       </div>
 
       <div class="text-center relative z-10">
-        <!-- Main Loading Animation -->
-        <div class="relative mb-8">
-          <!-- Outer Ring -->
-          <div
-            class="w-24 h-24 rounded-full border-4 border-transparent border-t-blue-500 border-r-purple-500 animate-spin mx-auto">
-          </div>
-          <!-- Inner Ring -->
-          <div
-            class="absolute top-2 left-2 w-20 h-20 rounded-full border-4 border-transparent border-b-green-400 border-l-yellow-400 animate-spin"
-            style="animation-direction: reverse; animation-duration: 1.5s;"></div>
-          <!-- Center Dot -->
-          <div
-            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse">
-          </div>
-        </div>
-
         <!-- Animated Text -->
         <div class="mb-6">
           <h2
@@ -197,10 +222,13 @@ function getEditorValue() {
                 <SelectValue placeholder="Select Framework" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="playwrite">Playwright</SelectItem>
-                <SelectItem value="cypress">Cypress</SelectItem>
-                <SelectItem value="selenium">Selenium</SelectItem>
-                <SelectItem value="puppeteer">Puppeteer</SelectItem>
+                <SelectItem 
+                  v-for="(displayName, key) in frameworkDisplayNames" 
+                  :key="key" 
+                  :value="key"
+                >
+                  {{ displayName }}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -213,10 +241,13 @@ function getEditorValue() {
                 <SelectValue placeholder="Select Language" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="javascript">JavaScript</SelectItem>
-                <SelectItem value="c_sharp">C#</SelectItem>
-                <SelectItem value="java">Java</SelectItem>
-                <SelectItem value="python">Python</SelectItem>
+                <SelectItem 
+                  v-for="language in availableLanguages" 
+                  :key="language" 
+                  :value="language"
+                >
+                  {{ languageDisplayNames[language] || language }}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
