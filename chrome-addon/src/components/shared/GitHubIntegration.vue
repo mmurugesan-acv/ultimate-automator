@@ -2,6 +2,9 @@
 import { ref, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 
+// Define emits
+const emit = defineEmits(['auth-change', 'repository-selected'])
+
 const githubUser = ref(null)
 const isGithubAuthenticated = ref(false)
 const githubRepositories = ref([])
@@ -10,9 +13,13 @@ const selectedRepository = ref(null)
 const githubToken = ref(null)
 
 onMounted(() => {
-  chrome.storage.local.get(['githubToken'], async (result) => {
+  chrome.storage.local.get(['githubToken', 'selectedRepository'], async (result) => {
     if (result.githubToken) {
       await verifyGitHubToken(result.githubToken)
+    }
+    if (result.selectedRepository) {
+      selectedRepository.value = result.selectedRepository
+      emit('repository-selected', result.selectedRepository)
     }
   })
 })
@@ -36,6 +43,9 @@ async function verifyGitHubToken(token) {
       githubToken.value = token
       isGithubAuthenticated.value = true
       
+      // Emit authentication change
+      emit('auth-change', true)
+      
       // Store token in backend
       await storeTokenInBackend(token, result.user.id.toString())
       
@@ -44,6 +54,7 @@ async function verifyGitHubToken(token) {
     } else {
       console.error('Token verification failed:', result.error)
       chrome.storage.local.remove(['githubToken'])
+      emit('auth-change', false)
     }
   } catch (error) {
     console.error('Error verifying GitHub token:', error)
@@ -119,6 +130,9 @@ function handleGitHubAuth() {
         githubToken.value = token
         isGithubAuthenticated.value = true
         
+        // Emit authentication change
+        emit('auth-change', true)
+        
         await storeTokenInBackend(token, user.id.toString())
         await loadRepositories(token)
         
@@ -145,6 +159,9 @@ function handleGitHubAuth() {
 async function selectRepository(repo) {
   selectedRepository.value = repo
   console.log('Selected repository:', repo)
+  
+  // Emit repository selection
+  emit('repository-selected', repo)
   
   // Store selection on server
   if (githubUser.value) {
