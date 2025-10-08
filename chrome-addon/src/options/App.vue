@@ -23,6 +23,7 @@ import LightDarkMode from '@/components/shared/light-dark-mode-changer/LightDark
 import RaisePR from '@/components/RaisePR.vue'
 import TestRunner from '@/components/TestRunner.vue'
 import LoadingScreen from '@/components/LoadingScreen.vue'
+import GitHubProfile from '@/components/shared/GitHubProfile.vue'
 
 const editorContainer = ref(null)
 let capturedData = null
@@ -247,10 +248,11 @@ async function handleGenerateCode() {
         </div>
       </div>
 
-      <!-- Right: Run Test, Raise PR, and Theme Toggle -->
+      <!-- Right: Run Test, Raise PR, GitHub Profile, and Theme Toggle -->
       <div class="flex items-center gap-3">
         <TestRunner :editorInstance="editorInstance" />
         <RaisePR :editorInstance="editorInstance" />
+        <GitHubProfile />
         <LightDarkMode />
       </div>
     </div>
