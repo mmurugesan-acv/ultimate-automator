@@ -24,6 +24,7 @@ import RaisePR from '@/components/RaisePR.vue'
 import TestRunner from '@/components/TestRunner.vue'
 import LoadingScreen from '@/components/LoadingScreen.vue'
 import GitHubProfile from '@/components/shared/GitHubProfile.vue'
+import FloatingChat from '@/components/FloatingChat.vue'
 
 const editorContainer = ref(null)
 let capturedData = null
@@ -269,6 +270,9 @@ async function handleGenerateCode() {
 
     <!-- Loading Screen Component -->
     <LoadingScreen :isVisible="isLoading" />
+
+    <!-- Floating Chat Component with framework and language context -->
+    <FloatingChat :framework="selectedType" :language="selectedView" />
   </div>
 </template>
 
