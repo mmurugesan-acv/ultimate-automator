@@ -25,6 +25,7 @@ import TestRunner from '@/components/TestRunner.vue'
 import LoadingScreen from '@/components/LoadingScreen.vue'
 import GitHubProfile from '@/components/shared/GitHubProfile.vue'
 import FloatingChat from '@/components/FloatingChat.vue'
+import { Label } from '@/components/ui/label'
 
 const editorContainer = ref(null)
 let capturedData = null
@@ -202,10 +203,9 @@ async function handleGenerateCode() {
     <div class="flex justify-between items-center mb-6">
       <!-- Left: Dropdowns -->
       <div class="flex items-end gap-6">
-        <!-- Dropdown 1 -->
         <div class="flex flex-col">
-          <label class="text-sm font-medium mb-1 text-muted-foreground">Testing Framework</label>
-          <Select v-model="selectedType">
+          <Label for="framework-select" class="text-sm font-medium mb-1 text-muted-foreground">Testing Framework</Label>
+          <Select v-model="selectedType" id="framework-select">
             <SelectTrigger class="w-[160px]">
               <SelectValue placeholder="Select Framework" />
             </SelectTrigger>
@@ -217,10 +217,9 @@ async function handleGenerateCode() {
           </Select>
         </div>
 
-        <!-- Dropdown 2 -->
         <div class="flex flex-col">
-          <label class="text-sm font-medium mb-1 text-muted-foreground">Language</label>
-          <Select v-model="selectedView">
+          <Label for="language-select" class="text-sm font-medium mb-1 text-muted-foreground">Language</Label>
+          <Select v-model="selectedView" id="language-select">
             <SelectTrigger class="w-[160px]">
               <SelectValue placeholder="Select Language" />
             </SelectTrigger>
@@ -232,10 +231,10 @@ async function handleGenerateCode() {
           </Select>
         </div>
 
-        <!-- Generate Code Button -->
         <div class="flex flex-col">
-          <label class="text-sm font-medium mb-1 text-muted-foreground opacity-0">Generate</label>
-          <Button 
+          <Label for="generate-code-btn" class="text-sm font-medium mb-1 text-muted-foreground opacity-0">Generate</Label>
+          <Button
+            id="generate-code-btn"
             @click="handleGenerateCode" 
             :disabled="isLoading"
             variant="default"
